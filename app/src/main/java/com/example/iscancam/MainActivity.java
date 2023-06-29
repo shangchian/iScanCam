@@ -3,12 +3,19 @@ package com.example.iscancam;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.camera.core.Camera;
+import androidx.camera.core.CameraControl;
 import androidx.camera.core.CameraSelector;
+import androidx.camera.core.FocusMeteringAction;
+import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageCapture;
 import androidx.camera.core.ImageCaptureException;
+import androidx.camera.core.ImageProxy;
+import androidx.camera.core.MeteringPoint;
+import androidx.camera.core.MeteringPointFactory;
 import androidx.camera.core.Preview;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
+import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.lifecycle.LifecycleOwner;
@@ -21,26 +28,40 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.util.DisplayMetrics;
 import android.util.Log;
+import android.util.Size;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import com.example.iscancam.apiManager.apiManager;
 import com.example.iscancam.camera.RectangleOverlay;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
+import com.journeyapps.barcodescanner.camera.CameraSettings;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
@@ -61,7 +82,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private RectangleOverlay rectangleOverlay;
     private static final String[] PERMISSIONS = new String[]{Manifest.permission.CAMERA};
 
-
+    // Data
+    private String scanIPCamId = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -78,6 +100,29 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         // 檢查讀寫外部存儲的權限
         requestStoragePermission();
+
+        // modify --------------------------------------------------------------------
+        TextView usernameTextView = findViewById(R.id.username_textview);
+        usernameTextView.setText("登入中...");
+
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                String response = apiManager.login();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        // 更新TextView的文本
+                        usernameTextView.setText(response);
+
+                        // 顯示Toast提示
+                        Toast.makeText(MainActivity.this, response, Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+        });
+        thread.start();
+        // ---------------------------------------------------------------------------
     }
 
     @Override
@@ -135,6 +180,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             Bitmap imageBitmap = (Bitmap) extras.get("data");
             // Do something with the imageBitmap
             imageView.setImageBitmap(imageBitmap);
+            Toast.makeText(MainActivity.this, "圖片", Toast.LENGTH_LONG).show();
 
             // Launch DrawingActivity to draw a box around the live view
 //            Intent intent = new Intent(MainActivity.this, DrawingActivity.class);
@@ -149,7 +195,37 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         if (result != null) {
             if (result.getContents() != null) {
                 // 顯示QR碼的資訊
-                Toast.makeText(this, result.getContents(), Toast.LENGTH_LONG).show();
+                // Toast.makeText(this, result.getContents(), Toast.LENGTH_LONG).show();
+
+
+                // modify --------------------------------------------------------------------
+                // 透過 AIModel 辨識當前 IPCam
+                TextView usernameTextView = findViewById(R.id.username_textview);
+                usernameTextView.setText("IPCam 辨識中...");
+
+                Thread thread = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        JSONObject response = apiManager.getIPCamInfoByAIModel(result.getContents());
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    scanIPCamId = response.getString("Id").toString().replace("\"", "");
+                                    String scanIPCamName = response.getString("Name").toString().replace("\"", "");
+                                    usernameTextView.setText("目前 IPCam 是：" + scanIPCamName);
+                                    JSONArray targetCoordinate = response.getJSONArray("TargetCoordinate");
+                                    rectangleOverlay.drawRectByTargetCoordinate(targetCoordinate);
+                                } catch (JSONException e) {
+                                    throw new RuntimeException(e);
+                                }
+                            }
+                        });
+                    }
+                });
+                thread.start();
+                // ---------------------------------------------------------------------------
+
             } else {
                 Toast.makeText(this, "掃描取消", Toast.LENGTH_LONG).show();
             }
@@ -308,10 +384,51 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         Preview preview = new Preview.Builder()
                 .build();
 
+        // modify --------------------------------------------------------------------
+        // 獲取裝置的屏幕解析度
+        DisplayMetrics displayMetrics = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+        int screenWidth = displayMetrics.widthPixels;
+        int screenHeight = displayMetrics.heightPixels;
         // 相機有 拍照 功能
         imageCapture = new ImageCapture.Builder()
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                .setTargetResolution(new Size(screenWidth, screenHeight))
                 .build();
+
+        // 設置預覽視圖的寬度和高度為相機的解析度
+        // previewView.setLayoutParams(new ConstraintLayout.LayoutParams(screenWidth, screenHeight));
+        // ---------------------------------------------------------------------------
+
+        // modify --------------------------------------------------------------------
+        previewView.post(new Runnable() {
+            @Override
+            public void run() {
+                previewView.setOnTouchListener(new View.OnTouchListener() {
+                    @Override
+                    public boolean onTouch(View v, MotionEvent event) {
+                        switch (event.getAction()) {
+                            case MotionEvent.ACTION_DOWN:
+                                return true;
+                            case MotionEvent.ACTION_UP:
+                                MeteringPointFactory factory = previewView.getMeteringPointFactory();
+                                MeteringPoint autoFocusPoint = factory.createPoint(event.getX(), event.getY());
+                                Camera camera = cameraProvider.bindToLifecycle((LifecycleOwner) v.getContext(), cameraSelector, preview, imageCapture);
+                                CameraControl cameraControl = camera.getCameraControl();
+                                cameraControl.startFocusAndMetering(
+                                        new FocusMeteringAction.Builder(autoFocusPoint, FocusMeteringAction.FLAG_AF)
+                                                .setAutoCancelDuration(5, TimeUnit.SECONDS)
+                                                .build()
+                                );
+                                return true;
+                            default:
+                                return false; // Unhandled event.
+                        }
+                    }
+                });
+            }
+        });
+        // ---------------------------------------------------------------------------
 
         Camera camera = cameraProvider.bindToLifecycle((LifecycleOwner) this, cameraSelector, preview, imageCapture);
         preview.setSurfaceProvider(previewView.getSurfaceProvider());
@@ -396,6 +513,63 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                                     if (cursor.moveToFirst()) {
                                         @SuppressLint("Range") String filePath = cursor.getString(cursor.getColumnIndex(MediaStore.Images.Media.DATA));
                                         Log.d("TAG", "Image saved path: " + filePath);
+
+                                        // modify --------------------------------------------------------------------
+                                        // 上傳圖片
+                                        TextView usernameTextView = findViewById(R.id.username_textview);
+                                        usernameTextView.setText("圖片上傳中...");
+                                        Thread uploadImagethread = new Thread(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                String iPCamId = scanIPCamId;
+                                                File imageFile = new File(filePath);
+//                                                File myFile = new File("/storage/emulated/0/Download/哈瑪星IPCam1 2023-05-11 下午 01.40.50.jpg");
+
+                                                // 呼叫上傳圖片API
+                                                String imageURL = apiManager.uploadIPCamFile(iPCamId, imageFile);
+                                                runOnUiThread(new Runnable() {
+                                                    @Override
+                                                    public void run() {
+//                                                        imageView.setImageBitmap(BitmapFactory.decodeFile(imageFile.getAbsolutePath()));
+                                                        // 顯示圖片網址
+                                                        usernameTextView.setText(imageURL);
+                                                        if (imageURL.contains("java.net")){
+                                                            // 顯示Toast提示
+                                                            Toast.makeText(MainActivity.this, "上傳失敗", Toast.LENGTH_LONG).show();
+                                                        } else {
+                                                            // 顯示Toast提示
+                                                            Toast.makeText(MainActivity.this, "上傳成功", Toast.LENGTH_LONG).show();
+                                                        }
+
+                                                        // 透過 url 取得圖片
+                                                        Thread getImageThread = new Thread(new Runnable() {
+                                                            @Override
+                                                            public void run() {
+                                                                Bitmap imageBit = apiManager.showImage(imageURL);
+                                                                runOnUiThread(new Runnable() {
+                                                                    @Override
+                                                                    public void run() {
+                                                                        imageView.setImageBitmap(imageBit);
+                                                                    }
+                                                                });
+                                                            }
+                                                        });
+                                                        getImageThread.start();
+                                                    }
+                                                });
+                                            }
+                                        });
+                                        uploadImagethread.start();
+
+                                        // 拍照後，關閉相機
+                                        try {
+                                            stopCamera();
+                                        } catch (ExecutionException e) {
+                                            throw new RuntimeException(e);
+                                        } catch (InterruptedException e) {
+                                            throw new RuntimeException(e);
+                                        }
+                                        // ---------------------------------------------------------------------------
                                     }
                                     cursor.close();
                                 }

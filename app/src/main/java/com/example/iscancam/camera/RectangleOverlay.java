@@ -8,6 +8,11 @@ import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.View;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+
+import java.util.ArrayList;
+
 /*
 因爲 RectangleOverlay 類繼承了 View，所以它可以像其他視圖組件一樣使用。當您將 RectangleOverlay 添加到佈局中時，它會與其他視圖一起顯示。在這種情況下，它會與相機預覽一起顯示，使矩形框顯示在預覽的頂部。
 
@@ -17,7 +22,7 @@ onDraw() 方法在 RectangleOverlay 類中被重寫，它負責繪制矩形框�
 
  */
 public class RectangleOverlay extends View {
-    private Rect mRect;
+    private ArrayList<Rect> mRectList = new ArrayList<>();
     private Paint mPaint;
 
     public RectangleOverlay(Context context) {
@@ -31,7 +36,7 @@ public class RectangleOverlay extends View {
     }
 
     private void init() {
-        mRect = new Rect(100, 100, 400, 400);
+        mRectList.add(new Rect(100, 100, 400, 400));
         mPaint = new Paint();
         mPaint.setColor(Color.RED);
         mPaint.setStyle(Paint.Style.STROKE);
@@ -41,19 +46,39 @@ public class RectangleOverlay extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        canvas.drawRect(mRect, mPaint);
+        for (Rect rect : mRectList) {
+            canvas.drawRect(rect, mPaint);
+        }
     }
 
     // 動態調整矩形方框的位置和大小。
-    public void setRectanglePosition(int left, int top, int right, int bottom) {
-        mRect.set(left, top, right, bottom);
+    public void setRectanglePosition(int rectIndex, int left, int top, int right, int bottom) {
+        mRectList.get(rectIndex).set(left, top, right, bottom);
         invalidate(); // 通知視圖重繪
     }
 
-    public void setRectangleSize(int width, int height) {
-        int centerX = mRect.centerX();
-        int centerY = mRect.centerY();
-        mRect.set(centerX - width / 2, centerY - height / 2, centerX + width / 2, centerY + height / 2);
+    public void setRectangleSize(int rectIndex, int width, int height) {
+        int centerX = mRectList.get(rectIndex).centerX();
+        int centerY = mRectList.get(rectIndex).centerY();
+        mRectList.get(rectIndex).set(centerX - width / 2, centerY - height / 2, centerX + width / 2, centerY + height / 2);
+        mRectList.get(rectIndex).set(centerX - width / 2, centerY - height / 2, centerX + width / 2, centerY + height / 2);
         invalidate(); // 通知視圖重繪
+    }
+
+    public void drawRectByTargetCoordinate(JSONArray targetCoordinateArray) {
+        mRectList.clear();
+        try {
+            for (int i = 0; i < targetCoordinateArray.length(); i++) {
+                JSONArray coordinateArray = targetCoordinateArray.getJSONArray(i);
+                int x1 = coordinateArray.getInt(0);
+                int y1 = coordinateArray.getInt(1);
+                int x2 = coordinateArray.getInt(2);
+                int y2 = coordinateArray.getInt(3);
+                mRectList.add(new Rect((int) x1, (int) y1, (int) x2, (int) y2));
+            }
+            invalidate(); // 通知視圖重繪
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
     }
 }
