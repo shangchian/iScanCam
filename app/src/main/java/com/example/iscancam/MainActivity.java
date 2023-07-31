@@ -6,30 +6,24 @@ import androidx.camera.core.Camera;
 import androidx.camera.core.CameraControl;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.FocusMeteringAction;
-import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageCapture;
 import androidx.camera.core.ImageCaptureException;
-import androidx.camera.core.ImageProxy;
 import androidx.camera.core.MeteringPoint;
 import androidx.camera.core.MeteringPointFactory;
 import androidx.camera.core.Preview;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
-import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.lifecycle.LifecycleOwner;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Canvas;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -50,7 +44,6 @@ import com.example.iscancam.camera.RectangleOverlay;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
-import com.journeyapps.barcodescanner.camera.CameraSettings;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -58,8 +51,9 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -73,6 +67,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private Button btnScanQRCode, btnStartCamera, btnCloseCamera, btnCapture;
     private ImageView imageView;
+    private TextView txvUsername, txvRecognitionResult;
 
     // OSD
     private ListenableFuture<ProcessCameraProvider> cameraProviderFuture;
@@ -84,6 +79,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     // Data
     private String scanIPCamId = "";
+    /*  recognitionData
+        index 0: Value
+        index 1: ImagePath
+     */
+    private ArrayList<String> recognitionData = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -102,8 +102,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         requestStoragePermission();
 
         // modify --------------------------------------------------------------------
-        TextView usernameTextView = findViewById(R.id.username_textview);
-        usernameTextView.setText("登入中...");
+        txvUsername.setText("登入中...");
 
         Thread thread = new Thread(new Runnable() {
             @Override
@@ -113,7 +112,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     @Override
                     public void run() {
                         // 更新TextView的文本
-                        usernameTextView.setText(response);
+                        txvUsername.setText(response);
 
                         // 顯示Toast提示
                         Toast.makeText(MainActivity.this, response, Toast.LENGTH_LONG).show();
@@ -200,8 +199,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                 // modify --------------------------------------------------------------------
                 // 透過 AIModel 辨識當前 IPCam
-                TextView usernameTextView = findViewById(R.id.username_textview);
-                usernameTextView.setText("IPCam 辨識中...");
+                txvUsername.setText("IPCam 辨識中...");
 
                 Thread thread = new Thread(new Runnable() {
                     @Override
@@ -213,7 +211,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                                 try {
                                     scanIPCamId = response.getString("Id").toString().replace("\"", "");
                                     String scanIPCamName = response.getString("Name").toString().replace("\"", "");
-                                    usernameTextView.setText("目前 IPCam 是：" + scanIPCamName);
+                                    txvUsername.setText("目前 IPCam 是：" + scanIPCamName);
                                     JSONArray targetCoordinate = response.getJSONArray("TargetCoordinate");
                                     rectangleOverlay.drawRectByTargetCoordinate(targetCoordinate);
                                 } catch (JSONException e) {
@@ -249,6 +247,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         // ImageView: 顯示照片
         imageView = findViewById(R.id.imageView);
+
+        // TextView
+        txvUsername = findViewById(R.id.username_textview);
+        txvRecognitionResult = findViewById(R.id.result);
 
         // Open camera and draw OSD on preview
         previewView = findViewById(R.id.previewView);
@@ -516,8 +518,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                                         // modify --------------------------------------------------------------------
                                         // 上傳圖片
-                                        TextView usernameTextView = findViewById(R.id.username_textview);
-                                        usernameTextView.setText("圖片上傳中...");
+                                        txvUsername.setText("圖片上傳中...");
                                         Thread uploadImagethread = new Thread(new Runnable() {
                                             @Override
                                             public void run() {
@@ -526,14 +527,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 //                                                File myFile = new File("/storage/emulated/0/Download/哈瑪星IPCam1 2023-05-11 下午 01.40.50.jpg");
 
                                                 // 呼叫上傳圖片API
-                                                String imageURL = apiManager.uploadIPCamFile(iPCamId, imageFile);
+                                                String result = apiManager.uploadIPCamFile(iPCamId, imageFile);
+
+                                                getRecognitionData(result);
+
                                                 runOnUiThread(new Runnable() {
                                                     @Override
                                                     public void run() {
 //                                                        imageView.setImageBitmap(BitmapFactory.decodeFile(imageFile.getAbsolutePath()));
                                                         // 顯示圖片網址
-                                                        usernameTextView.setText(imageURL);
-                                                        if (imageURL.contains("java.net")){
+                                                        if("".equals(recognitionData.get(1))){
+                                                            txvUsername.setText("");
+                                                        }else{
+                                                            txvUsername.setText(recognitionData.get(1));
+                                                        }
+                                                        if (recognitionData.get(1).contains("java.net")){
                                                             // 顯示Toast提示
                                                             Toast.makeText(MainActivity.this, "上傳失敗", Toast.LENGTH_LONG).show();
                                                         } else {
@@ -545,11 +553,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                                                         Thread getImageThread = new Thread(new Runnable() {
                                                             @Override
                                                             public void run() {
-                                                                Bitmap imageBit = apiManager.showImage(imageURL);
+                                                                Bitmap imageBit = null;
+                                                                if(!"".equals(recognitionData.get(1))){
+                                                                    imageBit = apiManager.showImage(recognitionData.get(1));
+                                                                }
+                                                                Bitmap finalImageBit = imageBit;
                                                                 runOnUiThread(new Runnable() {
                                                                     @Override
                                                                     public void run() {
-                                                                        imageView.setImageBitmap(imageBit);
+                                                                        if(finalImageBit != null){
+                                                                            imageView.setImageBitmap(finalImageBit);
+                                                                        }
+                                                                        txvRecognitionResult.setText(recognitionData.get(0));
                                                                     }
                                                                 });
                                                             }
@@ -613,5 +628,55 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES);
         }
         return contentValues;
+    }
+
+    private ArrayList<String> getRecognitionData(String responseStr) {
+        //imageView.setImageResource(R.drawable.ic_launcher_foreground);
+        recognitionData.clear();
+        String imageURL = "";
+        String jsonRecognitionData = "";
+        JSONArray jsonArray = null;
+
+        if (responseStr != null && !responseStr.equals("\"[]\"")) {
+            try {
+                jsonArray = new JSONArray(responseStr);
+                JSONObject jsonObject = jsonArray.getJSONObject(0);
+
+
+                String imagePath = jsonObject.getString("imagePath");
+                imageURL = String.format("https://magicmodulesdata.hamastar.com.tw/api/Storage/%s/download", imagePath);
+
+
+                JSONObject valueObject = new JSONObject(jsonObject.getString("value"));
+
+                // 將 valueObject 轉換為指定格式的字串
+                StringBuilder formattedStrBuilder = new StringBuilder();
+                Iterator<String> keys = valueObject.keys();
+                while (keys.hasNext()) {
+                    double value = 0;
+                    String key = keys.next();
+                    if (valueObject.isNull(key)){
+
+                    } else {
+                        value = valueObject.getDouble(key);
+                    }
+                    formattedStrBuilder.append(key).append(" = ").append(value).append(", ");
+                }
+                // 刪除最後一個多餘的逗號和空格
+                String formattedStr = formattedStrBuilder.toString();
+                if (formattedStr.endsWith(", ")) {
+                    formattedStr = formattedStr.substring(0, formattedStr.length() - 2);
+                }
+                jsonRecognitionData = formattedStr;
+
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+
+            recognitionData.add(0, jsonRecognitionData);     // Value: 感測數據
+            recognitionData.add(1, imageURL);                // ImagePath: 圖檔儲存位置
+        }
+
+        return recognitionData;
     }
 }

@@ -6,43 +6,64 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <Button
-        android:id="@+id/scan_button"
-        android:layout_width="0dp"
+    <LinearLayout
+        android:id="@+id/ButtonList"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Scan QR Code"
+        android:orientation="horizontal"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="16dp"/>
+        android:layout_marginTop="16dp">
 
-    <Button
-        android:id="@+id/start_camera_button"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:text="Start Camera"
-        app:layout_constraintTop_toBottomOf="@+id/scan_button"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        <Button
+            android:id="@+id/scan_button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginLeft="3dp"
+            android:layout_marginRight="6dp"
+            android:text="掃描維瑪" />
 
-    <Button
-        android:id="@+id/close_camera_button"
-        android:layout_width="0dp"
+        <Button
+            android:id="@+id/start_camera_button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="開啟相機"
+            android:layout_marginRight="6dp"
+            android:focusableInTouchMode="true" />
+
+        <Button
+            android:id="@+id/close_camera_button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="關閉相機"
+            android:layout_marginRight="3dp"
+            android:visibility="gone"
+            android:focusableInTouchMode="true" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/result"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Close Camera"
-        android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="@+id/start_camera_button"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginTop="5dp"
+        app:layout_constraintTop_toBottomOf="@+id/ButtonList"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent" />
 
     <ImageView
         android:id="@+id/imageView"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        app:layout_constraintBottom_toBottomOf="parent"
+        android:layout_marginTop="15dp"
+        android:layout_marginBottom="15dp"
+        app:layout_constraintBottom_toTopOf="@+id/username_textview"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/start_camera_button" />
+        app:layout_constraintTop_toBottomOf="@+id/result" />
 
     <androidx.camera.view.PreviewView
         android:id="@+id/previewView"
@@ -62,11 +83,11 @@
         android:layout_height="150dp"
         android:background="@color/zxing_transparent"
         android:layout_marginRight="30dp"
-        android:layout_marginTop="170dp"
+        android:layout_marginTop="210dp"
         app:backgroundTint="@color/zxing_transparent"
         app:icon="@drawable/capture_photo_camera_150"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/close_camera_button" />
+        app:layout_constraintTop_toBottomOf="@+id/ButtonList" />
 
     <!-- modify________________________________________________ -->
     <TextView

@@ -162,15 +162,14 @@ public class apiManager {
 
                     // Parse the response
                     if (resultString != null && !resultString.equals("\"[]\"")) {
-                        JSONArray jsonArray = new JSONArray(resultString);
-                        JSONObject jsonObject = jsonArray.getJSONObject(0);
-                        String imagePath = jsonObject.getString("imagePath");
-                        return String.format("https://magicmodulesdata.hamastar.com.tw/api/Storage/%s/download", imagePath);
+//                        JSONArray jsonArray = new JSONArray(resultString);
+//                        JSONObject jsonObject = jsonArray.getJSONObject(0);
+//                        String imagePath = jsonObject.getString("imagePath");
+//                        return String.format("https://magicmodulesdata.hamastar.com.tw/api/Storage/%s/download", imagePath);
+                        return resultString;
                     } else {
                         return null;
                     }
-                } catch (JSONException e) {
-                    throw new RuntimeException(e);
                 }
             } else {
                 // Read the error response
