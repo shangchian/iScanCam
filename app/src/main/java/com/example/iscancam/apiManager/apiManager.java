@@ -124,6 +124,44 @@ public class apiManager {
         return new JSONObject();
     }
 
+    public static String getTrainModelImage(String aiModel) {
+        String url = baseUrl + "/api/Manage/IPCamImageProcessor/SolomonProjectOriginalImage?AIModel=" + aiModel;
+        String resultString = "";
+
+        try {
+            URL urlData = new URL(url);
+            HttpURLConnection httpURLConnection = (HttpURLConnection) urlData.openConnection();
+            httpURLConnection.setReadTimeout(30000);
+            httpURLConnection.setConnectTimeout(30000);
+            httpURLConnection.setRequestMethod("GET");
+            // 在請求標頭中添加身份驗證的 token
+            httpURLConnection.setRequestProperty("Authorization", token);
+
+            //獲取server的回應
+            int responseCode = httpURLConnection.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(httpURLConnection.getInputStream()))) {
+                    String line;
+                    StringBuilder response = new StringBuilder();
+                    while ((line = br.readLine()) != null) {
+                        response.append(line);
+                    }
+                    JSONObject jsonObject = new JSONObject(response.toString());
+
+                    // 從 JSON 物件中取得 "imagePath" 的值
+                    String imageBase64Stream = jsonObject.getString("fileContents");
+                    resultString = imageBase64Stream;
+                }
+            }
+            httpURLConnection.disconnect();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            // DebugMessage.errorLog(TAG, "post", "Exception: "+e.toString());
+        }
+        return resultString;
+    }
+
     public static String uploadIPCamFile(String iPCamId, File imageFile) {
         String boundary = "----Boundary" + System.currentTimeMillis();
         String lineBreak = "\r\n";

@@ -6,12 +6,14 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
 /*
 因爲 RectangleOverlay 類繼承了 View，所以它可以像其他視圖組件一樣使用。當您將 RectangleOverlay 添加到佈局中時，它會與其他視圖一起顯示。在這種情況下，它會與相機預覽一起顯示，使矩形框顯示在預覽的頂部。
@@ -22,6 +24,7 @@ onDraw() 方法在 RectangleOverlay 類中被重寫，它負責繪制矩形框�
 
  */
 public class RectangleOverlay extends View {
+    private static final String TAG = RectangleOverlay.class.getSimpleName();
     private ArrayList<Rect> mRectList = new ArrayList<>();
     private Paint mPaint;
 
@@ -65,15 +68,23 @@ public class RectangleOverlay extends View {
         invalidate(); // 通知視圖重繪
     }
 
-    public void drawRectByTargetCoordinate(JSONArray targetCoordinateArray) {
+    public void drawRectByTargetCoordinate(HashMap<String, Integer> scale, JSONArray targetCoordinateArray) {
+        float PreviewWidth = scale.get("PreviewWidth");
+        float trainImageWidth = scale.get("TrainImageWidth");
+        float PreviewHeight = scale.get("PreviewHeight");
+        float trainImageHeight = scale.get("TrainImageHeight");
+        float scaleX = PreviewWidth / trainImageWidth;
+        float scaleY = PreviewHeight / trainImageHeight;
+        Log.d(TAG, "Scale width = " + scaleX);
+        Log.d(TAG, "Scale height = " + scaleY);
         mRectList.clear();
         try {
             for (int i = 0; i < targetCoordinateArray.length(); i++) {
                 JSONArray coordinateArray = targetCoordinateArray.getJSONArray(i);
-                int x1 = coordinateArray.getInt(0);
-                int y1 = coordinateArray.getInt(1);
-                int x2 = coordinateArray.getInt(2);
-                int y2 = coordinateArray.getInt(3);
+                int x1 = (int) (coordinateArray.getInt(0) * scaleX);
+                int y1 = (int) (coordinateArray.getInt(1) * scaleY);
+                int x2 = (int) (coordinateArray.getInt(2) * scaleX);
+                int y2 = (int) (coordinateArray.getInt(3) * scaleY);
                 mRectList.add(new Rect((int) x1, (int) y1, (int) x2, (int) y2));
             }
             invalidate(); // 通知視圖重繪

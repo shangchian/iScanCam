@@ -24,11 +24,19 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Color;
+import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.CameraManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Message;
 import android.provider.MediaStore;
+import android.util.Base64;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.Size;
@@ -53,7 +61,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.HashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -64,10 +72,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private static final int REQUEST_EXTERNAL_STORAGE_PERMISSION = 101;
     private static final int CAMERA_PERMISSION_REQUEST_CODE = 100;
     private static final int CAMERA_REQUEST_IMAGE_CAPTURE = 1;
+    public static final int HANDLER_MESSAGE_GET_MODEL_ID_READY = 0;
 
-    private Button btnScanQRCode, btnStartCamera, btnCloseCamera, btnCapture;
+
+    private ImageView ivScanQRCode, ivStartCamera, ivCloseCamera;
+    private Button btnCapture;
     private ImageView imageView;
-    private TextView txvUsername, txvRecognitionResult;
+    private TextView txvUsername, txvRecognitionResult, txvStatus;
 
     // OSD
     private ListenableFuture<ProcessCameraProvider> cameraProviderFuture;
@@ -84,6 +95,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         index 1: ImagePath
      */
     private ArrayList<String> recognitionData = new ArrayList<>();
+    private HashMap<String, Integer> resolutions = new HashMap<>();
+    public static Handler handler;
+    private Boolean isDrawRectReady = false;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -122,6 +137,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         });
         thread.start();
         // ---------------------------------------------------------------------------
+
+        setupHandler();
+        initCamera();
     }
 
     @Override
@@ -141,10 +159,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     @Override
     public void onClick(View v) {
-        if (v == btnScanQRCode) {
+        if (v == ivScanQRCode) {
             // 啟動掃描器
             startScanner();
-        } else if (v == btnStartCamera) {
+        } else if (v == ivStartCamera && isDrawRectReady) {
             // 相機按鈕點擊事件
             //dispatchTakePictureIntent();
 
@@ -153,7 +171,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             } else {
                 ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST_CODE);
             }
-        } else if (v == btnCloseCamera) {
+        } else if (v == ivCloseCamera) {
             try {
                 stopCamera();
             } catch (ExecutionException e) {
@@ -193,6 +211,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         // 接收 QR碼掃描器 的結果
         if (result != null) {
             if (result.getContents() != null) {
+                isDrawRectReady = false;
                 // 顯示QR碼的資訊
                 // Toast.makeText(this, result.getContents(), Toast.LENGTH_LONG).show();
 
@@ -213,7 +232,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                                     String scanIPCamName = response.getString("Name").toString().replace("\"", "");
                                     txvUsername.setText("目前 IPCam 是：" + scanIPCamName);
                                     JSONArray targetCoordinate = response.getJSONArray("TargetCoordinate");
-                                    rectangleOverlay.drawRectByTargetCoordinate(targetCoordinate);
+                                    sendHandlerMessage(HANDLER_MESSAGE_GET_MODEL_ID_READY, result.getContents(), targetCoordinate);
                                 } catch (JSONException e) {
                                     throw new RuntimeException(e);
                                 }
@@ -236,21 +255,23 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     // 元件綁定
     private void bindingsComponent() {
         // Button
-        btnScanQRCode = findViewById(R.id.scan_button);
-        btnStartCamera = findViewById(R.id.start_camera_button);
-        btnCloseCamera = findViewById(R.id.close_camera_button);
         btnCapture = findViewById(R.id.capture_button);
-        btnScanQRCode.setOnClickListener(this);
-        btnStartCamera.setOnClickListener(this);
-        btnCloseCamera.setOnClickListener(this);
         btnCapture.setOnClickListener(this);
 
-        // ImageView: 顯示照片
+        // ImageView
+        ivScanQRCode = findViewById(R.id.scan);
+        ivStartCamera = findViewById(R.id.start_camera);
+        ivCloseCamera = findViewById(R.id.close_camera);
         imageView = findViewById(R.id.imageView);
+        ivScanQRCode.setOnClickListener(this);
+        ivStartCamera.setOnClickListener(this);
+        ivCloseCamera.setOnClickListener(this);
+        ivCloseCamera.setVisibility(View.GONE);
 
         // TextView
-        txvUsername = findViewById(R.id.username_textview);
+        txvUsername = findViewById(R.id.username);
         txvRecognitionResult = findViewById(R.id.result);
+        txvStatus = findViewById(R.id.status);
 
         // Open camera and draw OSD on preview
         previewView = findViewById(R.id.previewView);
@@ -268,7 +289,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     // 設置元件監聽事件
     private void setOnClickListener() {
         // 設置 QRCode按鈕點擊事件
-        btnScanQRCode.setOnClickListener(new View.OnClickListener() {
+        ivScanQRCode.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
 
@@ -276,7 +297,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         });
 
         // 設置相機按鈕點擊事件
-        btnStartCamera.setOnClickListener(new View.OnClickListener() {
+        ivStartCamera.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
 
@@ -340,6 +361,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         if (!hasPermissions(this, PERMISSIONS)) {
             ActivityCompat.requestPermissions(this, PERMISSIONS, CAMERA_PERMISSION_REQUEST_CODE);
         } else {
+            Log.d(TAG, "previewView Width = " + previewView.getWidth());
+            Log.d(TAG, "previewView Height = " + previewView.getHeight());
             startCamera();
         }
     }
@@ -565,6 +588,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                                                                             imageView.setImageBitmap(finalImageBit);
                                                                         }
                                                                         txvRecognitionResult.setText(recognitionData.get(0));
+                                                                        if(recognitionData.get(2).equals("正常")){
+                                                                            int deepGreenColor = Color.rgb(0, 100, 0); // 使用 RGB 值來表示深綠色
+                                                                            txvStatus.setTextColor(deepGreenColor);
+                                                                            txvStatus.setText(recognitionData.get(2));
+                                                                        } else {
+                                                                            int textColor = Color.RED;
+                                                                            txvStatus.setTextColor(textColor);
+                                                                            txvStatus.setText(recognitionData.get(2));
+                                                                        }
                                                                     }
                                                                 });
                                                             }
@@ -606,15 +638,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private void showCamera(boolean show) {
         if (show) {
-            btnScanQRCode.setVisibility(View.GONE);
-            btnStartCamera.setVisibility(View.GONE);
-            btnCloseCamera.setVisibility(View.VISIBLE);
+            ivScanQRCode.setVisibility(View.GONE);
+            ivStartCamera.setVisibility(View.GONE);
+            ivCloseCamera.setVisibility(View.VISIBLE);
             previewView.setVisibility(View.VISIBLE);
             rectangleOverlay.setVisibility(View.VISIBLE);
         } else {
-            btnScanQRCode.setVisibility(View.VISIBLE);
-            btnStartCamera.setVisibility(View.VISIBLE);
-            btnCloseCamera.setVisibility(View.GONE);
+            ivScanQRCode.setVisibility(View.VISIBLE);
+            ivStartCamera.setVisibility(View.VISIBLE);
+            ivCloseCamera.setVisibility(View.GONE);
             previewView.setVisibility(View.GONE);
             rectangleOverlay.setVisibility(View.GONE);
         }
@@ -634,49 +666,133 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         //imageView.setImageResource(R.drawable.ic_launcher_foreground);
         recognitionData.clear();
         String imageURL = "";
-        String jsonRecognitionData = "";
+        String recognitionDataStr = "", sensingStatus = "";
         JSONArray jsonArray = null;
 
         if (responseStr != null && !responseStr.equals("\"[]\"")) {
             try {
                 jsonArray = new JSONArray(responseStr);
                 JSONObject jsonObject = jsonArray.getJSONObject(0);
+                JSONObject jsonIPCamDataObject = jsonObject.getJSONObject("iPCamData");
 
 
-                String imagePath = jsonObject.getString("imagePath");
+                String imagePath = jsonIPCamDataObject.getString("imagePath");
                 imageURL = String.format("https://magicmodulesdata.hamastar.com.tw/api/Storage/%s/download", imagePath);
-
-
-                JSONObject valueObject = new JSONObject(jsonObject.getString("value"));
-
-                // 將 valueObject 轉換為指定格式的字串
-                StringBuilder formattedStrBuilder = new StringBuilder();
-                Iterator<String> keys = valueObject.keys();
-                while (keys.hasNext()) {
-                    double value = 0;
-                    String key = keys.next();
-                    if (valueObject.isNull(key)){
-
-                    } else {
-                        value = valueObject.getDouble(key);
-                    }
-                    formattedStrBuilder.append(key).append(" = ").append(value).append(", ");
+                sensingStatus = jsonIPCamDataObject.getString("sensingStatus");
+                if (sensingStatus.contains("NG") || sensingStatus.contains("Warning")) {
+                    sensingStatus = "數值異常";
+                } else {
+                    sensingStatus = "正常";
                 }
-                // 刪除最後一個多餘的逗號和空格
-                String formattedStr = formattedStrBuilder.toString();
-                if (formattedStr.endsWith(", ")) {
-                    formattedStr = formattedStr.substring(0, formattedStr.length() - 2);
-                }
-                jsonRecognitionData = formattedStr;
+
+                recognitionDataStr = jsonObject.getString("showIPCamData");
 
             } catch (JSONException e) {
                 e.printStackTrace();
             }
 
-            recognitionData.add(0, jsonRecognitionData);     // Value: 感測數據
-            recognitionData.add(1, imageURL);                // ImagePath: 圖檔儲存位置
+            recognitionData.add(0, recognitionDataStr);     // showIPCamData: 感測數據
+            recognitionData.add(1, imageURL);                // imagePath: 圖檔儲存位置
+            recognitionData.add(2, sensingStatus);           // sensingStatus: 感測數值狀態
+        } else {
+            recognitionData.add(0, "");              // showIPCamData: 感測數據
+            recognitionData.add(1, "https://picsum.photos/200/300"); // imagePath: 圖檔儲存位置
+            recognitionData.add(2, "數值異常");        // sensingStatus: 感測數值狀態
         }
 
         return recognitionData;
+    }
+
+    private void setupHandler() {
+        handler = new Handler() {
+            @Override
+            public void handleMessage(Message msg) {
+                super.handleMessage(msg);
+                switch (msg.what) {
+                    case HANDLER_MESSAGE_GET_MODEL_ID_READY:
+                        Bundle bundle = msg.getData();
+                        String modelID = bundle.getString("modelID");
+                        String jsonArrayString = bundle.getString("jsonArrayCoordinate");
+                        try {
+                            JSONArray jsonArray = new JSONArray(jsonArrayString);
+                            Log.d(TAG, "GET_MODEL_ID_READY, ModelID = " + modelID + ", jsonArrayCoordinate = " + jsonArrayString);
+                            getTrainModelImage(modelID, jsonArray);
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+        };
+    }
+
+    private void sendHandlerMessage(int msg, String modelID, JSONArray coordinate){
+        Message sendMessage = new Message();;
+        Bundle bundle = new Bundle();
+
+        bundle.putString("modelID", modelID);
+        bundle.putString("jsonArrayCoordinate", coordinate.toString());
+
+        sendMessage.what = msg;
+        sendMessage.setData(bundle);
+        handler.sendMessage(sendMessage);
+    }
+
+    private void getTrainModelImage(String modelID, JSONArray targetCoordinate) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                String response = apiManager.getTrainModelImage(modelID);
+                // 將 Base64 編碼的字串轉換為 byte 陣列
+                byte[] imageBytes = Base64.decode(response, Base64.DEFAULT);
+
+                // 將 byte 陣列轉換為 Bitmap
+                Bitmap bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
+                int width = bitmap.getWidth();
+                int height = bitmap.getHeight();
+                resolutions.put("TrainImageWidth", width);
+                resolutions.put("TrainImageHeight", height);
+                Log.d(TAG, "PreviewWidth = " + resolutions.get("PreviewWidth"));
+                Log.d(TAG, "PreviewHeight = " + resolutions.get("PreviewHeight"));
+                Log.d(TAG, "TrainImageWidth = " + resolutions.get("TrainImageWidth"));
+                Log.d(TAG, "TrainImageHeight = " + resolutions.get("TrainImageHeight"));
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        rectangleOverlay.drawRectByTargetCoordinate(resolutions, targetCoordinate);
+                        isDrawRectReady = true;
+                        Toast.makeText(MainActivity.this, "輔助座標繪製完成", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        }).start();
+    }
+
+    private void initCamera() {
+        CameraManager cameraManager = (CameraManager) getSystemService(CAMERA_SERVICE);
+        try {
+            // 獲取第一個相機的相機特性
+            String cameraId = cameraManager.getCameraIdList()[0];
+            CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraId);
+
+            // 獲取相機的 live preview 解析度
+            Size previewSize = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+                    .getOutputSizes(android.graphics.ImageFormat.YUV_420_888)[0];
+
+            int width = previewSize.getWidth();
+            int height = previewSize.getHeight();
+            resolutions.clear();
+            resolutions.put("PreviewWidth", width);
+            resolutions.put("PreviewHeight", height);
+            resolutions.put("TrainImageWidth", 0);
+            resolutions.put("TrainImageHeight", 0);
+            Log.d("TAG", "Live preview 解析度：" + width + " x " + height);
+
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
     }
 }

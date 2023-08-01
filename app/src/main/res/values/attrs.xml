@@ -1,0 +1,4 @@
+<resources>
+    <attr name="dim_settings_title" format="dimension"/>
+
+</resources>

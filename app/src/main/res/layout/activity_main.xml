@@ -6,16 +6,39 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
+    <include
+        layout="@layout/toolbar"
+        android:id="@+id/Toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <androidx.camera.view.PreviewView
+        android:id="@+id/previewView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toBottomOf="@+id/Toolbar"
+        app:layout_constraintBottom_toBottomOf="parent"
+        android:visibility="invisible" />
+
+    <com.example.iscancam.camera.RectangleOverlay
+        android:id="@+id/rectangleOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toBottomOf="@+id/Toolbar"
+        app:layout_constraintBottom_toBottomOf="parent"
+        android:visibility="invisible" />
+
     <LinearLayout
         android:id="@+id/ButtonList"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/Toolbar"
+        android:visibility="gone"
         android:layout_marginTop="16dp">
 
         <Button
-            android:id="@+id/scan_button"
+            android:id="@+id/scan_button_gone"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -24,35 +47,51 @@
             android:text="掃描維瑪" />
 
         <Button
-            android:id="@+id/start_camera_button"
+            android:id="@+id/start_camera_button_gone"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="開啟相機"
-            android:layout_marginRight="6dp"
-            android:focusableInTouchMode="true" />
+            android:layout_marginRight="6dp" />
 
         <Button
-            android:id="@+id/close_camera_button"
+            android:id="@+id/close_camera_button_gone"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="關閉相機"
             android:layout_marginRight="3dp"
-            android:visibility="gone"
-            android:focusableInTouchMode="true" />
+            android:visibility="gone" />
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/result"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:id="@+id/TvList"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:layout_marginTop="5dp"
-        app:layout_constraintTop_toBottomOf="@+id/ButtonList"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent" />
+        android:orientation="horizontal"
+        app:layout_constraintTop_toBottomOf="@+id/Toolbar"
+        android:layout_marginTop="16dp">
+
+        <TextView
+            android:id="@+id/status"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_weight="10"
+            android:layout_marginLeft="5dp"
+            android:gravity="center_vertical" />
+
+        <TextView
+            android:id="@+id/result"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_weight="90"
+            android:layout_marginLeft="8dp"
+            android:layout_marginRight="5dp" />
+    </LinearLayout>
 
     <ImageView
         android:id="@+id/imageView"
@@ -60,22 +99,10 @@
         android:layout_height="0dp"
         android:layout_marginTop="15dp"
         android:layout_marginBottom="15dp"
-        app:layout_constraintBottom_toTopOf="@+id/username_textview"
+        app:layout_constraintBottom_toTopOf="@+id/username"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/result" />
-
-    <androidx.camera.view.PreviewView
-        android:id="@+id/previewView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="invisible" />
-
-    <com.example.iscancam.camera.RectangleOverlay
-        android:id="@+id/rectangleOverlay"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="invisible" />
+        app:layout_constraintTop_toBottomOf="@+id/TvList" />
 
     <Button
         android:id="@+id/capture_button"
@@ -87,11 +114,11 @@
         app:backgroundTint="@color/zxing_transparent"
         app:icon="@drawable/capture_photo_camera_150"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/ButtonList" />
+        app:layout_constraintTop_toBottomOf="@+id/Toolbar" />
 
     <!-- modify________________________________________________ -->
     <TextView
-        android:id="@+id/username_textview"
+        android:id="@+id/username"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="未登入"

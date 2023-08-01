@@ -1,0 +1,13 @@
+<resources>
+    <!-- Base application actionbar theme. -->
+    <style name="ActionBarTheme" parent="@android:style/Widget.Holo.Light.ActionBar">
+        <!-- Customize your theme here. -->
+        <item name="android:background">@color/purple_500</item>
+        <item name="android:textSize">19sp</item>
+    </style>
+
+    <!-- for ToolBar -->
+    <style name="Toolbar.TitleText" parent="TextAppearance.Widget.AppCompat.Toolbar.Title">
+        <item name="android:textSize">?dim_settings_title</item>
+    </style>
+</resources>

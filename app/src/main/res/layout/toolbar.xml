@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.appcompat.widget.Toolbar xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/toolbar"
+    android:layout_width="match_parent"
+    android:layout_height="60dp"
+    android:fitsSystemWindows="true"
+    android:minHeight="?attr/actionBarSize"
+    app:titleTextAppearance="@style/Toolbar.TitleText"
+    app:titleTextColor="@color/tb_title"
+    style="@style/ActionBarTheme">
+    <!-- It's difference meaning between style=... and theme=... description -->
+    <!-- Shang_Liu edit -->
+
+    <TextView
+        android:id="@+id/txv_iScan"
+        android:layout_width="160dp"
+        android:layout_height="50dp"
+        android:layout_gravity="left"
+        android:layout_marginRight="25dp"
+        android:gravity="center_vertical"
+        android:textStyle="bold"
+        android:textSize="20sp"
+        android:textColor="@color/white"
+        android:text="iScanCam"/>
+
+    <ImageView
+        android:id="@+id/close_camera"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_gravity="right"
+        android:layout_marginRight="25dp"
+        android:src="@drawable/hotkey_homeaction_orange" />
+
+    <ImageView
+        android:id="@+id/start_camera"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_below="@+id/close_camera_button1"
+        android:layout_gravity="right"
+        android:layout_marginRight="7dp"
+        android:src="@drawable/hotkey_homecontrol_orange" />
+
+    <ImageView
+        android:id="@+id/scan"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_below="@+id/start_camera_button"
+        android:layout_gravity="right"
+        android:layout_marginRight="7dp"
+        android:src="@drawable/hotkey_meter_orange" />
+
+</androidx.appcompat.widget.Toolbar>
+
